@@ -25,7 +25,8 @@ if not os.path.exists(STATIC_DIR):
     os.makedirs(STATIC_DIR)
 
 # Monta a pasta static para servir áudios e o mapa
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+# app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
 # --- CONFIGURAÇÃO DA IA (GEMINI) ---
 genai.configure(api_key="AIzaSyDGCEnesZvSDZx4VEs9pYQMMgqC-pcU1pE")
