@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Oris - Mentalização Planetária</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -44,17 +44,21 @@
             50% { opacity: 1; transform: scale(1.2); }
         }
         
+/* Mantém o original, mas garante que o fundo não atrapalhe */
         #map { 
             position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; 
             opacity: 0; transition: opacity 3s ease, border-radius 5s ease, width 5s ease, height 5s ease; 
             background: transparent !important;
-            /* Desativa cursor de mãozinha para reforçar que não é interativo */
             cursor: default !important;
         }
 
         .globe-view #map {
             border-radius: 50%;
-            width: 75vh; height: 75vh;
+            /* AJUSTE RESPONSIVO: Usa o menor valor entre largura e altura (vmin) */
+            /* Isso garante que o círculo nunca saia da tela, seja no PC ou Celular */
+            width: 85vmin; 
+            height: 85vmin;
+            
             left: 50%; top: 50%;
             transform: translate(-50%, -50%);
             box-shadow: 
@@ -63,6 +67,14 @@
                 inset 10px 10px 30px rgba(255,255,255,0.1);
         }
 
+        /* AJUSTE PARA TELAS PEQUENAS (Celulares em modo retrato) */
+        @media (max-width: 600px) {
+            .globe-view #map {
+                width: 90vw;   /* No celular, usa 90% da largura da tela */
+                height: 90vw;  /* Mantém a altura igual à largura para ser um círculo perfeito */
+            }
+        }
+        
         #energy-field {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             border-radius: 50%; z-index: 10; pointer-events: none; opacity: 0;

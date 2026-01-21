@@ -12,7 +12,13 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
+# Detecta se está no Render ou Local
+IS_RENDER = "RENDER" in os.environ
+
 app = FastAPI(title="Oris - Oração Sincronizada")
+
+# O mount serve os assets (JS, CSS, MP3) de dentro da pasta static
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # --- CONFIGURAÇÃO DA IA (GEMINI) ---
 api_key = os.environ.get("GOOGLE_API_KEY", "AIzaSyDGCEnesZvSDZx4VEs9pYQMMgqC-pcU1pE")
@@ -44,7 +50,6 @@ async def read_mapa():
     return HTMLResponse(f"Erro: mapa.html não encontrado na pasta static: {path_mapa}", status_code=404)
 
 # --- SINCRONIZAÇÃO E IA ---
-
 @app.get("/sync")
 def sync_clock():
     agora = datetime.now()
@@ -75,9 +80,10 @@ async def gerar_meditacao(dados: DadosMeditacao):
         print(f"Erro na geração: {e}")
         return {"texto": "Em harmonia com o todo.", "audio_url": ""}
 
-# O mount serve os assets (JS, CSS, MP3) de dentro da pasta static
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
+# No final do arquivo, o bloco de execução:
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # Se estiver no Render, usa a porta deles. Se for local, usa 8000.
+    port = int(os.environ.get("PORT", 8000))
+    # No local, o reload=True ajuda no desenvolvimento (reinicia ao salvar)
+    # No Render, o reload deve ser False
+    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=not IS_RENDER)
