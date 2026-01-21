@@ -53,7 +53,7 @@ async def read_mapa():
 @app.get("/sync")
 def sync_clock():
     agora = datetime.now()
-    seg_restantes = 15 - ((agora.hour * 3600 + agora.minute * 60 + agora.second) % 15)
+    seg_restantes = 10 #15 - ((agora.hour * 3600 + agora.minute * 60 + agora.second) % 15)
     return {"segundos_restantes": seg_restantes}
 
 @app.post("/gerar-meditacao")
