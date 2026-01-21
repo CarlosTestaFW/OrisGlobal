@@ -1,40 +1,30 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime
 import google.generativeai as genai
 import edge_tts
 import uvicorn
 import os
 
-# --- CONFIGURAÇÃO DE DIRETÓRIOS (FIXO PARA LINUX) ---
-# Pega o local exato onde este arquivo app.py está salvo
+# --- CONFIGURAÇÃO DE DIRETÓRIOS ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Define o caminho da pasta static
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
-# Define os caminhos dos arquivos HTML agora para evitar NameError
-INDEX_PATH = os.path.join(BASE_DIR, "index.html")
-MAPA_PATH = os.path.join(STATIC_DIR, "mapa.html") # Mapa dentro de /static
+# No Render, vamos garantir que o index.html seja buscado no lugar certo
+# Se o seu index.html estiver FORA da pasta static, use BASE_DIR. 
+# Se estiver DENTRO, use STATIC_DIR.
+INDEX_PATH = os.path.join(STATIC_DIR, "index.html") 
 
 app = FastAPI(title="Oris - Oração Sincronizada")
 
-# Cria a pasta static se ela não existir
-if not os.path.exists(STATIC_DIR):
-    os.makedirs(STATIC_DIR)
-
-# Monta a pasta static para servir áudios e o mapa
-# app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
-
 # --- CONFIGURAÇÃO DA IA (GEMINI) ---
-genai.configure(api_key="AIzaSyDGCEnesZvSDZx4VEs9pYQMMgqC-pcU1pE")
+# Usando a variável de ambiente para segurança, mas mantendo o fallback para sua chave
+api_key = os.environ.get("GOOGLE_API_KEY", "AIzaSyDGCEnesZvSDZx4VEs9pYQMMgqC-pcU1pE")
+genai.configure(api_key=api_key)
 MODEL_NAME = 'models/gemini-1.5-flash'
-try:
-    model = genai.GenerativeModel(MODEL_NAME)
-except Exception as e:
-    print(f"Erro Gemini: {e}")
+model = genai.GenerativeModel(MODEL_NAME)
 
 class DadosMeditacao(BaseModel):
     bairro: str
@@ -44,22 +34,15 @@ class DadosMeditacao(BaseModel):
 # --- ROTAS DE NAVEGAÇÃO ---
 
 @app.get("/")
-def read_index():
-    """Entrega a Página Inicial (na raiz)"""
+async def read_index():
+    """Entrega a Página Inicial"""
     if os.path.exists(INDEX_PATH):
         return FileResponse(INDEX_PATH)
-    return HTMLResponse(f"Erro: index.html não encontrado em {INDEX_PATH}", status_code=404)
-
-@app.get("/mapa.html")
-def read_mapa():
-    """Entrega a Página do Mapa (dentro de /static)"""
-    if os.path.exists(MAPA_PATH):
-        return FileResponse(MAPA_PATH)
-    return HTMLResponse(f"Erro: mapa.html não encontrado em {MAPA_PATH}", status_code=404)
-
-@app.get("/favicon.ico", include_in_schema=False)
-def favicon():
-    return HTMLResponse("", status_code=204)
+    # Fallback caso o index esteja na raiz e não na static
+    INDEX_RAIZ = os.path.join(BASE_DIR, "index.html")
+    if os.path.exists(INDEX_RAIZ):
+        return FileResponse(INDEX_RAIZ)
+    return HTMLResponse("Erro: index.html não encontrado. Verifique se o arquivo está na pasta static ou na raiz.", status_code=404)
 
 # --- SINCRONIZAÇÃO E IA ---
 
@@ -79,6 +62,10 @@ async def gerar_meditacao(dados: DadosMeditacao):
         audio_filename = "meditacao.mp3"
         audio_save_path = os.path.join(STATIC_DIR, audio_filename)
 
+        # Garante que a pasta static existe antes de salvar o áudio
+        if not os.path.exists(STATIC_DIR):
+            os.makedirs(STATIC_DIR)
+
         communicate = edge_tts.Communicate(texto, "pt-BR-AntonioNeural")
         await communicate.save(audio_save_path)
         
@@ -90,15 +77,9 @@ async def gerar_meditacao(dados: DadosMeditacao):
         print(f"Erro na geração: {e}")
         return {"texto": "Em harmonia com o todo.", "audio_url": ""}
 
-# if __name__ == "__main__":
-#     # Host 0.0.0.0 é melhor para Linux/Docker/Rede Local
-#     # uvicorn.run(app, host="0.0.0.0", port=8000)
-#     import os
-#     port = int(os.environ.get("PORT", 8000))
-#     uvicorn.run(app, host="0.0.0.0", port=port)
+# Montamos a pasta static POR ÚLTIMO para não conflitar com a rota "/"
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 if __name__ == "__main__":
-    import uvicorn
-    import os
     port = int(os.environ.get("PORT", 10000))
     uvicorn.run(app, host="0.0.0.0", port=port)
