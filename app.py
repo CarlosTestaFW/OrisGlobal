@@ -12,15 +12,9 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
-# No Render, vamos garantir que o index.html seja buscado no lugar certo
-# Se o seu index.html estiver FORA da pasta static, use BASE_DIR. 
-# Se estiver DENTRO, use STATIC_DIR.
-INDEX_PATH = os.path.join(STATIC_DIR, "index.html") 
-
 app = FastAPI(title="Oris - Oração Sincronizada")
 
 # --- CONFIGURAÇÃO DA IA (GEMINI) ---
-# Usando a variável de ambiente para segurança, mas mantendo o fallback para sua chave
 api_key = os.environ.get("GOOGLE_API_KEY", "AIzaSyDGCEnesZvSDZx4VEs9pYQMMgqC-pcU1pE")
 genai.configure(api_key=api_key)
 MODEL_NAME = 'models/gemini-1.5-flash'
@@ -35,14 +29,19 @@ class DadosMeditacao(BaseModel):
 
 @app.get("/")
 async def read_index():
-    """Entrega a Página Inicial"""
-    if os.path.exists(INDEX_PATH):
-        return FileResponse(INDEX_PATH)
-    # Fallback caso o index esteja na raiz e não na static
-    INDEX_RAIZ = os.path.join(BASE_DIR, "index.html")
-    if os.path.exists(INDEX_RAIZ):
-        return FileResponse(INDEX_RAIZ)
-    return HTMLResponse("Erro: index.html não encontrado. Verifique se o arquivo está na pasta static ou na raiz.", status_code=404)
+    """Entrega a Página Inicial (index.html)"""
+    path = os.path.join(STATIC_DIR, "index.html")
+    if os.path.exists(path):
+        return FileResponse(path)
+    return HTMLResponse("Erro: index.html não encontrado na pasta static.", status_code=404)
+
+@app.get("/mapa.html")
+async def read_mapa():
+    """ROTA FIX: Entrega a Página do Mapa quando acessada diretamente"""
+    path = os.path.join(STATIC_DIR, "mapa.html")
+    if os.path.exists(path):
+        return FileResponse(path)
+    return HTMLResponse("Erro: mapa.html não encontrado na pasta static.", status_code=404)
 
 # --- SINCRONIZAÇÃO E IA ---
 
@@ -62,7 +61,6 @@ async def gerar_meditacao(dados: DadosMeditacao):
         audio_filename = "meditacao.mp3"
         audio_save_path = os.path.join(STATIC_DIR, audio_filename)
 
-        # Garante que a pasta static existe antes de salvar o áudio
         if not os.path.exists(STATIC_DIR):
             os.makedirs(STATIC_DIR)
 
@@ -77,7 +75,7 @@ async def gerar_meditacao(dados: DadosMeditacao):
         print(f"Erro na geração: {e}")
         return {"texto": "Em harmonia com o todo.", "audio_url": ""}
 
-# Montamos a pasta static POR ÚLTIMO para não conflitar com a rota "/"
+# O mount fica por último para servir os assets (JS, CSS, MP3) dentro de /static
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 if __name__ == "__main__":
