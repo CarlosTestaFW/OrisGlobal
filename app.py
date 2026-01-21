@@ -29,19 +29,19 @@ class DadosMeditacao(BaseModel):
 
 @app.get("/")
 async def read_index():
-    """Entrega a Página Inicial (index.html)"""
-    path = os.path.join(STATIC_DIR, "index.html")
-    if os.path.exists(path):
-        return FileResponse(path)
-    return HTMLResponse("Erro: index.html não encontrado na pasta static.", status_code=404)
+    """Entrega a Página Inicial (index.html) que está na RAIZ"""
+    path_index = os.path.join(BASE_DIR, "index.html")
+    if os.path.exists(path_index):
+        return FileResponse(path_index)
+    return HTMLResponse(f"Erro: index.html não encontrado na raiz: {path_index}", status_code=404)
 
 @app.get("/mapa.html")
 async def read_mapa():
-    """ROTA FIX: Entrega a Página do Mapa quando acessada diretamente"""
-    path = os.path.join(STATIC_DIR, "mapa.html")
-    if os.path.exists(path):
-        return FileResponse(path)
-    return HTMLResponse("Erro: mapa.html não encontrado na pasta static.", status_code=404)
+    """Entrega a Página do Mapa que está em /static"""
+    path_mapa = os.path.join(STATIC_DIR, "mapa.html")
+    if os.path.exists(path_mapa):
+        return FileResponse(path_mapa)
+    return HTMLResponse(f"Erro: mapa.html não encontrado na pasta static: {path_mapa}", status_code=404)
 
 # --- SINCRONIZAÇÃO E IA ---
 
@@ -75,7 +75,7 @@ async def gerar_meditacao(dados: DadosMeditacao):
         print(f"Erro na geração: {e}")
         return {"texto": "Em harmonia com o todo.", "audio_url": ""}
 
-# O mount fica por último para servir os assets (JS, CSS, MP3) dentro de /static
+# O mount serve os assets (JS, CSS, MP3) de dentro da pasta static
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 if __name__ == "__main__":
