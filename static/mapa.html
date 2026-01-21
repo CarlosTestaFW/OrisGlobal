@@ -27,6 +27,7 @@
             background: transparent !important; cursor: default !important;
         }
 
+        /* CONFIGURAÇÃO DO GLOBO TERRESTRE */
         .globe-view #map {
             border-radius: 50%; width: 85vmin; height: 85vmin;
             left: 50%; top: 50%; transform: translate(-50%, -50%);
@@ -54,12 +55,12 @@
             box-shadow: 0 15px 50px rgba(0,0,0,0.8); pointer-events: none;
         }
 
-        /* TIMER DE DEBUG - DESATIVADO (display: none) */
+        /* TIMER DE DEBUG - DESATIVADO */
         #debug-timer {
             display: none; 
             position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
-            background: rgba(0, 120, 215, 0.8); color: white;
-            font-family: monospace; font-size: 11px; padding: 4px 12px;
+            background: rgba(0, 120, 215, 0.9); color: white;
+            font-family: monospace; font-size: 11px; padding: 6px 14px;
             border-radius: 4px; z-index: 200; pointer-events: none;
         }
 
@@ -74,7 +75,7 @@
     <div id="map"></div>
     <div id="energy-field"></div>
     <div id="subtitles"></div>
-    <div id="debug-timer">Debug: Aguardando sincronização...</div>
+    <div id="debug-timer">Debug: Ativo</div>
 
     <audio id="bg-meditation" loop src="/static/meditation_432.mp3"></audio>
 
@@ -101,18 +102,20 @@
         const subtitleDiv = document.getElementById('subtitles');
         let userCoords = { lat: -23.55, lon: -46.63 };
 
-        async function runDebugTimer(fase, segundos) {
-            if (debugEl.style.display !== 'none') {
-                for (let i = segundos; i > 0; i--) {
-                    debugEl.innerText = `DEBUG | FASE: ${fase} | T: ${i}s | TOTAL PEDAÇO: 11s`;
-                    await new Promise(r => setTimeout(r, 1000));
+        function runWait(segundos, label) {
+            return new Promise(async (resolve) => {
+                if (debugEl.style.display !== 'none') {
+                    for (let i = segundos; i > 0; i--) {
+                        debugEl.innerText = `DEBUG | ${label} | T: ${i}s`;
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
+                } else {
+                    await new Promise(r => setTimeout(r, segundos * 1000));
                 }
-            } else {
-                await new Promise(r => setTimeout(r, segundos * 1000));
-            }
+                resolve();
+            });
         }
 
-        // CADÊNCIA COM VOZ SINCRONIZADA: 1s (Pausa) -> 1s (FadeIn) -> VOZ + 7s (Exposto) -> 1s (FadeOut) -> 1s (Pausa)
         async function exibirTextoEmPedacos(texto) {
             const frases = texto.match(/[^.!?]+[.!?]+/g) || [texto];
 
@@ -121,32 +124,39 @@
 
                 // 1. Respiro Pré (1s)
                 subtitleDiv.style.opacity = "0";
-                await runDebugTimer("RESPIRO PRÉ", 1);
+                await runWait(1, "PAUSA");
 
-                // 2. Fade In (1s)
+                // 2. Fade In (1s) + Voz Imediata
                 subtitleDiv.innerText = textoLimpo;
                 subtitleDiv.style.opacity = "1";
-                await runDebugTimer("FADE IN", 1);
                 
-                // 3. DISPARO DA VOZ IA (Sincronizado com o início da leitura estática)
                 const narraAudio = new Audio(`/api/voice?text=${encodeURIComponent(textoLimpo)}`);
-                narraAudio.volume = 0.9; // Volume da voz superior ao da música de fundo
-                narraAudio.play().catch(e => console.log("Aguardando interação para áudio:", e));
+                narraAudio.volume = 0.9;
+                narraAudio.play().catch(e => console.log("Áudio pendente"));
 
-                // 4. Lendo / Ouvindo (7s)
-                await runDebugTimer("LENDO + VOZ", 7);
+                // 3. Exposição (8s)
+                await runWait(8, "VOZ/LEITURA");
                 
-                // 5. Fade Out (1s)
+                // 4. Fade Out (1s)
                 subtitleDiv.style.opacity = "0";
-                await runDebugTimer("FADE OUT", 1);
+                await runWait(1, "FADE OUT");
 
-                // 6. Respiro Pós (1s)
-                await runDebugTimer("RESPIRO PÓS", 1);
+                // 5. Respiro Pós (1s)
+                await runWait(1, "PAUSA FINAL");
             }
         }
 
         function atualizarTamanhoGlobo(zoom) {
-            let tamanhos = { 18: '150px', 15: '150px', 14: '400px', 10: '600px', 8: '800px', 4: '90vw', 2: '75vh' };
+            // Ajuste para abranger toda a imagem no zoom orbital (2)
+            let tamanhos = { 
+                18: '180px', 
+                15: '200px', 
+                14: '450px', 
+                10: '650px', 
+                8: '850px', 
+                4: '95vw', 
+                2: '100vmin' // Garante cobertura total da Terra circular
+            };
             const size = tamanhos[zoom] || '100px';
             const ef = document.getElementById('energy-field');
             if (ef) { ef.style.width = size; ef.style.height = size; }
@@ -163,7 +173,7 @@
 
         async function iniciarJornadaOrbital() {
             const audioMed = document.getElementById('bg-meditation');
-            audioMed.volume = 0.4; // Baixamos um pouco a música para dar foco à voz da IA
+            audioMed.volume = 0.4;
             audioMed.play().catch(() => { window.addEventListener('click', () => audioMed.play(), {once: true}); });
 
             await exibirTextoEmPedacos(scriptsMentalizacao[18]);
@@ -179,11 +189,10 @@
             subtitleDiv.innerText = "A paz começa em mim, a paz começa no mundo.";
             subtitleDiv.style.opacity = "1";
             
-            // Voz final de encerramento
             const vozFinal = new Audio(`/api/voice?text=${encodeURIComponent("A paz começa em mim, a paz começa no mundo.")}`);
             vozFinal.play();
 
-            await new Promise(r => setTimeout(r, 12000));
+            await runWait(12, "FIM");
             document.body.style.opacity = "0";
             setTimeout(() => { window.location.href = "/"; }, 4000);
         }
