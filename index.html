@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oris - Corrente de Oração Planetária</title>
+    <link rel="icon" href="data:,">
+    <style>
+        :root { 
+            --accent: #9c27b0; 
+            --glow: #ce93d8; 
+            --deep-space: #05050a;
+        }
+
+        body, html { 
+            margin: 0; padding: 0; height: 100%; width: 100%; 
+            background: var(--deep-space); color: white; 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            overflow: hidden; 
+        }
+
+        .stars-bg {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, #1a0a2e 0%, #05050a 100%);
+            z-index: -1;
+        }
+
+        main { display: flex; height: 100vh; width: 100vw; }
+
+        .content-section {
+            flex: 1; display: flex; flex-direction: column;
+            justify-content: center; padding: 0 8%;
+            z-index: 2; transition: opacity 1.5s ease;
+        }
+
+        header h1 {
+            font-size: 4.5rem; margin: 0; letter-spacing: -2px;
+            background: linear-gradient(to right, #fff, var(--glow));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+
+        /* Painel Lateral (Direita) */
+        .action-sidebar {
+            position: relative;
+            width: 450px; background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px); border-left: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; z-index: 10; padding: 40px;
+            overflow: hidden; text-align: center;
+        }
+
+        #start-btn {
+            padding: 25px 50px; cursor: pointer;
+            background: var(--accent); color: white; border: none; border-radius: 12px;
+            font-size: 1.1rem; font-weight: bold; width: 100%; z-index: 30;
+            box-shadow: 0 10px 20px rgba(156, 39, 176, 0.3);
+            transition: all 0.4s ease;
+        }
+
+        /* GLOBO DE ENERGIA LILÁS */
+        #energy-globe {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 0; height: 0; border-radius: 50%;
+            background: radial-gradient(circle, rgba(206, 147, 216, 0.7) 0%, rgba(156, 39, 176, 0.3) 60%, transparent 100%);
+            box-shadow: 0 0 80px rgba(156, 39, 176, 0.4);
+            opacity: 0; transition: width 3s ease, height 3s ease, opacity 2s ease;
+            z-index: 5; pointer-events: none;
+            mix-blend-mode: screen;
+        }
+
+        /* CRONÔMETRO */
+        #countdown { 
+            font-size: 5rem; font-weight: 800; display: none; z-index: 20;
+            text-shadow: 0 0 30px var(--accent); color: white; 
+            margin-bottom: 20px;
+        }
+
+        /* LEGENDA DENTRO DA DIV DO GLOBO */
+        #subtitles {
+            z-index: 20; display: none;
+            width: 80%; font-size: 1.1rem; opacity: 0;
+            transition: opacity 1s; font-style: italic;
+            color: var(--glow); line-height: 1.4;
+            min-height: 3em; /* Espaço fixo para evitar saltos no layout */
+        }
+
+        /* Estados de Transição */
+        .waiting-mode #start-btn { display: none; }
+        .waiting-mode #countdown, .waiting-mode #subtitles { display: block; }
+        .waiting-mode #energy-globe { 
+            width: 500px; height: 500px; opacity: 1; 
+            animation: pulse-globe 4s infinite ease-in-out; 
+        }
+
+        @keyframes pulse-globe {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+            50% { transform: translate(-50%, -50%) scale(1.05); opacity: 0.9; }
+        }
+    </style>
+</head>
+<body id="main-body">
+    <div class="stars-bg"></div>
+    <audio id="audio-abertura" src="/static/abertura_432.mp3" loop></audio>
+
+    <main>
+        <section class="content-section">
+            <header><h1>Oris</h1></header>
+            <p style="font-size: 1.4rem; line-height: 1.8; max-width: 600px; font-weight: 300; color: rgba(255,255,255,0.9);">
+                Um momento de união global.<br><br>
+                A cada 15 minutos, formamos uma rede invisível de luz. <span style="color: var(--glow);">Sua presença é a peça que faltava</span>.
+            </p>
+        </section>
+
+        <aside class="action-sidebar">
+            <button id="start-btn" onclick="iniciarFluxo()">Entrar na Corrente</button>
+            
+            <div id="countdown">00:00</div>
+            <div id="subtitles"></div>
+            
+            <div id="energy-globe"></div>
+        </aside>
+    </main>
+
+    <script>
+        let segRestantes = 0;
+        const audio = document.getElementById('audio-abertura');
+
+        function calcularTempo() {
+            const agora = new Date();
+            const min = agora.getMinutes();
+            const seg = agora.getSeconds();
+            const proximoBloco = Math.ceil((min + 0.1) / 15) * 15;
+            segRestantes = (proximoBloco - min) * 60 - seg;
+        }
+
+        function iniciarFluxo() {
+            calcularTempo();
+            document.getElementById('main-body').classList.add('waiting-mode');
+            
+            audio.volume = 0;
+            audio.play();
+            let vol = 0;
+            const fadeIn = setInterval(() => {
+                if (vol < 0.4) { vol += 0.02; audio.volume = vol; } else { clearInterval(fadeIn); }
+            }, 100);
+
+            const timer = setInterval(() => {
+                segRestantes--;
+                const m = Math.floor(segRestantes / 60);
+                const s = segRestantes % 60;
+                document.getElementById('countdown').innerText = 
+                    `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+
+                atualizarLegendas(segRestantes);
+
+                if (segRestantes <= 0) {
+                    clearInterval(timer);
+                    document.body.style.transition = "opacity 2s";
+                    document.body.style.opacity = 0;
+                    setTimeout(() => { window.location.href = "mapa.html"; }, 2000);
+                }
+            }, 1000);
+        }
+
+        function atualizarLegendas(s) {
+            const sub = document.getElementById('subtitles');
+            sub.style.opacity = 1;
+            if (s > 45) sub.innerText = "Respire fundo... sinta a energia lilás ao seu redor.";
+            else if (s > 25) sub.innerText = "O mundo silencia para ouvir a nossa intenção coletiva.";
+            else if (s > 5) sub.innerText = "Prepare-se... a conexão orbital vai começar.";
+            else { sub.style.opacity = 0; }
+        }
+    </script>
+</body>
+</html>

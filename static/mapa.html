@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oris - Mentalização Planetária</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root { --accent: #9c27b0; --glow: #ce93d8; }
+        
+        body, html { 
+            margin: 0; padding: 0; height: 100%; overflow: hidden; 
+            background-color: #020205;
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(50, 0, 80, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 80% 70%, rgba(0, 20, 50, 0.15) 0%, transparent 40%);
+            color: white; font-family: 'Segoe UI', sans-serif; 
+        }
+
+        .stars-container {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0; pointer-events: none;
+        }
+
+        .stars {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: transparent;
+        }
+
+        .stars-small { 
+            box-shadow: 442px 145px #FFF, 120px 800px #FFF, 1200px 400px #FFF, 800px 200px #FFF, 50px 50px #FFF, 1500px 900px #FFF, 1000px 100px #FFF, 300px 600px #FFF;
+            width: 1px; height: 1px; border-radius: 50%; opacity: 0.5;
+            animation: twinkle 4s infinite ease-in-out;
+        }
+        .stars-medium { 
+            box-shadow: 200px 300px #FFF, 900px 700px #FFF, 1400px 150px #FFF, 600px 400px #FFF, 100px 900px #FFF;
+            width: 2px; height: 2px; border-radius: 50%; opacity: 0.7;
+            animation: twinkle 6s infinite ease-in-out;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+        
+        #map { 
+            position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; 
+            opacity: 0; transition: opacity 3s ease, border-radius 5s ease, width 5s ease, height 5s ease; 
+            background: transparent !important;
+            /* Desativa cursor de mãozinha para reforçar que não é interativo */
+            cursor: default !important;
+        }
+
+        .globe-view #map {
+            border-radius: 50%;
+            width: 75vh; height: 75vh;
+            left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 
+                0 0 80px rgba(156, 39, 176, 0.5),
+                inset -20px -20px 50px rgba(0,0,0,0.8),
+                inset 10px 10px 30px rgba(255,255,255,0.1);
+        }
+
+        #energy-field {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            border-radius: 50%; z-index: 10; pointer-events: none; opacity: 0;
+            mix-blend-mode: screen;
+            background: radial-gradient(circle, rgba(156, 39, 176, 0.8) 0%, rgba(156, 39, 176, 0.3) 70%, transparent 100%);
+            transition: width 3s ease, height 3s ease, opacity 2s;
+        }
+
+        .pulse-wave {
+            position: absolute; top: 50%; left: 50%; border: 1.5px solid rgba(206, 147, 216, 0.4);
+            border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none;
+            z-index: 9; animation: wave-out 4s linear infinite;
+        }
+
+        @keyframes wave-out {
+            0% { width: 0%; height: 0%; opacity: 0.6; }
+            100% { width: 100%; height: 100%; opacity: 0; }
+        }
+
+        #subtitles {
+            position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%);
+            width: 85%; max-width: 800px; min-height: 100px;
+            background-color: rgba(5, 5, 10, 0.85); backdrop-filter: blur(12px);
+            border: 1px solid rgba(156, 39, 176, 0.4); border-radius: 15px;
+            display: flex; align-items: center; justify-content: center; text-align: center;
+            color: #ffffff; font-size: 1.4rem; line-height: 1.5; padding: 20px 40px;
+            z-index: 150; opacity: 0; transition: opacity 0.8s ease-in-out;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            pointer-events: none; /* Legenda não interfere em cliques */
+        }
+
+        .playing #map { opacity: 0.9; }
+        .playing #energy-field { opacity: 1; }
+        .playing #subtitles { opacity: 1; }
+    </style>
+</head>
+<body class="playing">
+
+    <div class="stars-container">
+        <div class="stars stars-small"></div>
+        <div class="stars stars-medium"></div>
+    </div>
+
+    <div id="map"></div>
+    <div id="energy-field">
+        <div class="pulse-wave" style="animation-delay: 0s;"></div>
+        <div class="pulse-wave" style="animation-delay: 1.3s;"></div>
+    </div>
+    <div id="subtitles"></div>
+
+    <audio id="bg-meditation" loop src="/static/meditation_432.mp3"></audio>
+
+    <script>
+        // MAPA CONFIGURADO PARA BLOQUEAR INTERAÇÃO (Zoom, Drag, DoubleClick)
+        const map = L.map('map', { 
+            center: [0, 0], 
+            zoom: 2, 
+            zoomControl: false, 
+            attributionControl: false, 
+            worldCopyJump: true,
+            dragging: false,           // Desativa arrastar o mapa
+            scrollWheelZoom: false,    // Desativa zoom com o scroll do mouse
+            doubleClickZoom: false,    // Desativa zoom com duplo clique
+            boxZoom: false,            // Desativa zoom por seleção de caixa
+            tap: false,                // Desativa interações de toque (mobile)
+            touchZoom: false,          // Desativa zoom de pinça (mobile)
+            keyboard: false            // Desativa controle pelo teclado
+        });
+
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
+            maxZoom: 19 
+        }).addTo(map);
+
+        const scriptsMentalizacao = {
+            18: "Respire fundo e sinta a vida pulsar em seu peito. Você é um canal de luz pura. Deixe que essa energia violeta remova as tensões, renovando cada célula e trazendo clareza absoluta.",
+            15: "Sua luz transborda e preenche cada canto do seu lar. Mentalizamos esta casa como um santuário de proteção. Que a harmonia habite aqui, abençoando à todos que aqui moram e aos que cruzarem este portal.",
+            14: "Expandimos nossa vibração para as ruas e vizinhos. Visualizamos uma rede de cooperação conectando cada residência. Que a segurança e a gentileza guiem os passos de todos na comunidade e que o amor fraterno seja unissono.",
+            10: "Projetamos luz sobre toda a nossa cidade. Mentalizamos o equilíbrio em nossos centros e bairros distantes. Que a convivência seja pacífica e que o cuidado mútuo floreça entre cada cidadão.",
+            8: "Nossa intenção abraça agora todo o nosso estado. Enviamos ondas de equilíbrio para as cidades e campos. Que a sabedoria oriente as decisões coletivas e que o amparo chegue aos vulneráveis.",
+            4: "Inundamos nossa nação com ondas de paz. Visualizamos a união de todos os povos que habitam este solo, transcendendo qualquer diferença. Que a prosperidade floresça com justiça e que o amor se manifeste em cuidado, amparo e fraternidade.",
+            2: "Tornamo-nos um com a Terra. Do alto, vemos um mundo sem fronteiras, envolto em uma redoma de cura. Que a corrente de oração planetária sustente a vida e eleve a consciência humana, que proteja a quem necessite, que fortaleça a quem espera e que ampare a quem precisa."
+        };
+
+        let userCoords = { lat: -23.55, lon: -46.63 };
+        const audio = document.getElementById('bg-meditation');
+        const subtitleDiv = document.getElementById('subtitles');
+
+        function atualizarTamanhoGlobo(zoom) {
+            let tamanhos = { 18: '150px', 15: '150px', 14: '400px', 10: '600px', 8: '800px', 4: '90vw', 2: '75vh' };
+            const size = tamanhos[zoom] || '100px';
+            const ef = document.getElementById('energy-field');
+            if (ef) { ef.style.width = size; ef.style.height = size; }
+        }
+
+        function zoomPara(zoom) {
+            return new Promise((resolve) => {
+                if (zoom === 2) document.body.classList.add('globe-view');
+                map.once('moveend', resolve);
+                atualizarTamanhoGlobo(zoom);
+                map.flyTo([userCoords.lat, userCoords.lon], zoom, { duration: 5 });
+            });
+        }
+
+        async function iniciarJornadaOrbital() {
+            audio.volume = 0.5;
+            audio.play().catch(() => { window.addEventListener('click', () => audio.play(), {once: true}); });
+
+            subtitleDiv.innerText = scriptsMentalizacao[18];
+            subtitleDiv.style.opacity = "1";
+            await new Promise(r => setTimeout(r, 17000));
+
+            subtitleDiv.style.opacity = "0";
+            await new Promise(r => setTimeout(r, 800));
+            subtitleDiv.innerText = scriptsMentalizacao[15];
+            subtitleDiv.style.opacity = "1";
+            await new Promise(r => setTimeout(r, 16200));
+
+            const etapas = [14, 10, 8, 4, 2];
+            for (const z of etapas) {
+                subtitleDiv.style.opacity = "0";
+                await new Promise(r => setTimeout(r, 1000));
+                await zoomPara(z);
+                subtitleDiv.innerText = scriptsMentalizacao[z];
+                subtitleDiv.style.opacity = "1";
+                await new Promise(r => setTimeout(r, 15000));
+                subtitleDiv.style.opacity = "0";
+                await new Promise(r => setTimeout(r, 1000));
+            }
+
+            subtitleDiv.innerText = "A paz começa em mim, a paz começa no mundo.";
+            subtitleDiv.style.opacity = "1";
+            await new Promise(r => setTimeout(r, 8000));
+            document.body.style.transition = "opacity 3s";
+            document.body.style.opacity = "0";
+            setTimeout(() => { window.location.href = "/"; }, 3000);
+        }
+
+        window.onload = () => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    userCoords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+                    configurarMapaInicial();
+                }, () => configurarMapaInicial());
+            } else {
+                configurarMapaInicial();
+            }
+        };
+
+        function configurarMapaInicial() {
+            map.setView([userCoords.lat, userCoords.lon], 18);
+            atualizarTamanhoGlobo(18);
+            document.getElementById('map').style.opacity = "1";
+            iniciarJornadaOrbital();
+        }
+    </script>
+</body>
+</html>

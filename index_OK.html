@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oris - Corrente de Oração Planetária</title>
+    <link rel="icon" href="data:,">
+    <style>
+        :root { 
+            --accent: #9c27b0; 
+            --glow: #ce93d8; 
+            --deep-space: #05050a;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        body, html { 
+            margin: 0; padding: 0; height: 100%; width: 100%; 
+            background: var(--deep-space); color: white; 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            overflow: hidden; 
+        }
+
+        /* Fundo Espacial Animado */
+        .stars-bg {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, #1a0a2e 0%, #05050a 100%);
+            z-index: -1;
+        }
+
+        .stars-bg::after {
+            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url('https://www.transparenttextures.com/patterns/stardust.png');
+            opacity: 0.4;
+        }
+
+        /* Layout Principal */
+        main {
+            display: flex; height: 100vh; width: 100vw;
+        }
+
+        /* Seção de Conteúdo (Esquerda) */
+        .content-section {
+            flex: 1; display: flex; flex-direction: column;
+            justify-content: center; padding: 0 8%;
+            z-index: 2; transition: opacity 1s ease;
+        }
+
+        header h1 {
+            font-size: 4.5rem; margin: 0; letter-spacing: -2px;
+            background: linear-gradient(to right, #fff, var(--glow));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+
+        .motto {
+            font-size: 1.2rem; color: var(--glow); letter-spacing: 4px;
+            margin-bottom: 2rem; text-transform: uppercase; font-weight: 300;
+        }
+
+        .description {
+            max-width: 500px; font-size: 1.2rem; line-height: 1.8;
+            color: rgba(255,255,255,0.8); font-weight: 300;
+        }
+
+        .highlight { color: var(--glow); font-weight: 500; }
+
+        /* Painel Lateral de Ação (Direita) */
+        .action-sidebar {
+            width: 400px; background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px); border-left: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; z-index: 10; padding: 40px;
+            box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+        }
+
+        #online-count {
+            font-size: 0.9rem; color: var(--glow); letter-spacing: 2px;
+            margin-bottom: 30px; font-weight: bold;
+        }
+
+        #start-btn {
+            padding: 25px 50px; cursor: pointer;
+            background: var(--accent); color: white; border: none; border-radius: 12px;
+            font-size: 1.1rem; font-weight: bold; width: 100%;
+            box-shadow: 0 10px 20px rgba(156, 39, 176, 0.3);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-transform: uppercase; letter-spacing: 1px;
+        }
+
+        #start-btn:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(156, 39, 176, 0.5);
+            background: #b030c6;
+        }
+
+        /* Elementos de Espera */
+        #countdown { 
+            font-size: 5rem; font-weight: 800; display: none;
+            text-shadow: 0 0 40px var(--accent); color: white;
+        }
+
+        #energy-field {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 0; height: 0; border-radius: 50%; z-index: 1;
+            background: radial-gradient(circle, rgba(156, 39, 176, 0.6) 0%, transparent 70%);
+            opacity: 0; transition: all 2s ease; pointer-events: none;
+        }
+
+        #subtitles {
+            position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%); width: 70%;
+            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(15px);
+            padding: 30px; border-radius: 25px; text-align: center;
+            font-size: 1.4rem; opacity: 0; transition: opacity 1s; z-index: 1100;
+            border: 1px solid rgba(156, 39, 176, 0.2);
+        }
+
+        /* Estados de Transição */
+        .waiting-mode .content-section { opacity: 0; pointer-events: none; }
+        .waiting-mode .action-sidebar { background: transparent; border: none; box-shadow: none; width: 100%; position: absolute; }
+        .waiting-mode #start-btn, .waiting-mode #online-count { display: none; }
+        .waiting-mode #countdown { display: block; }
+        .waiting-mode #energy-field { width: 600px; height: 600px; opacity: 1; }
+        .waiting-mode #subtitles { opacity: 1; }
+
+        @media (max-width: 900px) {
+            main { flex-direction: column; }
+            .action-sidebar { width: 100%; height: 300px; border-left: none; border-top: 1px solid rgba(255,255,255,0.1); }
+            header h1 { font-size: 3rem; }
+        }
+    </style>
+</head>
+<body id="main-body">
+    <div class="stars-bg"></div>
+
+    <main>
+        <section class="content-section" id="hero-text">
+            <div class="motto">Sincronia Divina</div>
+            <header>
+                <h1>Oris</h1>
+            </header>
+            <p class="description">
+                Você não está aqui por acaso. Neste exato momento, milhares de almas se preparam para elevar a vibração da Terra. <br><br>
+                O <span class="highlight">Oris</span> é um portal de convergência meditativa. Através do som sagrado e da visualização orbital, uniremos nossas intenções para curar, proteger e iluminar o nosso planeta.
+            </p>
+            <p style="color: var(--glow); font-size: 0.9rem; margin-top: 20px;">
+                ● Frequência de cura 432Hz ativa ao entrar.
+            </p>
+        </section>
+
+        <aside class="action-sidebar">
+            <div id="online-count">SINCRONIA ESTABELECIDA</div>
+            <button id="start-btn" onclick="iniciarFluxo()">Entrar na Corrente</button>
+            <div id="countdown">00:00</div>
+        </aside>
+    </main>
+
+    <div id="energy-field"></div>
+    <div id="subtitles"></div>
+
+    <script>
+        let audioCtx, masterGain, oscillator;
+        
+        // Lógica de tempo real para os 15 minutos
+        const agoraPre = new Date();
+        let segRestantes = (15 - (agoraPre.getMinutes() % 15)) * 60 - agoraPre.getSeconds();
+        let prontoParaIniciar = false;
+
+        function start432Hz() {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            masterGain = audioCtx.createGain();
+            oscillator = audioCtx.createOscillator();
+            oscillator.frequency.setValueAtTime(432, audioCtx.currentTime);
+            oscillator.connect(masterGain).connect(audioCtx.destination);
+            masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+            masterGain.gain.linearRampToValueAtTime(0.02, audioCtx.currentTime + 3); 
+            oscillator.start();
+        }
+
+        function stop432Hz() {
+            if (masterGain) {
+                masterGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 2);
+                setTimeout(() => { if(oscillator) oscillator.stop(); }, 2000);
+            }
+        }
+
+        const scriptsEspera = [
+            "Limpando o teu campo vibracional com a frequência de cura...",
+            "Elevando o teu campo áurico para uma oração potente...",
+            "Dissolvendo bloqueios e purificando as tuas intenções...",
+            "Conectando a tua alma à rede de luz planetária...",
+            "Prepara-te para o silêncio sagrado..."
+        ];
+
+        function sincronizarLegendas(segundos) {
+            const tempoUtil = segundos - 5; 
+            const tempoPorLegenda = (tempoUtil / scriptsEspera.length) * 1000;
+            let i = 0;
+            const proxima = () => {
+                if (i < scriptsEspera.length && prontoParaIniciar) {
+                    document.getElementById('subtitles').style.opacity = 0;
+                    setTimeout(() => {
+                        document.getElementById('subtitles').innerText = scriptsEspera[i];
+                        document.getElementById('subtitles').style.opacity = 1;
+                        i++;
+                        setTimeout(proxima, tempoPorLegenda);
+                    }, 1000);
+                }
+            };
+            proxima();
+        }
+
+        function iniciarFluxo() {
+            start432Hz();
+            document.getElementById('main-body').className = 'waiting-mode';
+            prontoParaIniciar = true;
+            sincronizarLegendas(segRestantes);
+            
+            const timer = setInterval(() => {
+                segRestantes--;
+                const m = Math.floor(segRestantes / 60);
+                const s = segRestantes % 60;
+                document.getElementById('countdown').innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+
+                if (segRestantes === 5) {
+                    stop432Hz();
+                    document.getElementById('subtitles').style.opacity = 0;
+                }
+
+                if (segRestantes <= 0) {
+                    clearInterval(timer);
+                    // Suaviza a saída para o mapa
+                    document.body.style.opacity = 0;
+                    setTimeout(() => { window.location.href = "mapa.html"; }, 1000);
+                }
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
