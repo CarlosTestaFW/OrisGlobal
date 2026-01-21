@@ -44,7 +44,6 @@
             50% { opacity: 1; transform: scale(1.2); }
         }
         
-/* Mantém o original, mas garante que o fundo não atrapalhe */
         #map { 
             position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; 
             opacity: 0; transition: opacity 3s ease, border-radius 5s ease, width 5s ease, height 5s ease; 
@@ -54,11 +53,8 @@
 
         .globe-view #map {
             border-radius: 50%;
-            /* AJUSTE RESPONSIVO: Usa o menor valor entre largura e altura (vmin) */
-            /* Isso garante que o círculo nunca saia da tela, seja no PC ou Celular */
             width: 85vmin; 
             height: 85vmin;
-            
             left: 50%; top: 50%;
             transform: translate(-50%, -50%);
             box-shadow: 
@@ -67,11 +63,10 @@
                 inset 10px 10px 30px rgba(255,255,255,0.1);
         }
 
-        /* AJUSTE PARA TELAS PEQUENAS (Celulares em modo retrato) */
         @media (max-width: 600px) {
             .globe-view #map {
-                width: 90vw;   /* No celular, usa 90% da largura da tela */
-                height: 90vw;  /* Mantém a altura igual à largura para ser um círculo perfeito */
+                width: 90vw;
+                height: 90vw;
             }
         }
         
@@ -94,16 +89,36 @@
             100% { width: 100%; height: 100%; opacity: 0; }
         }
 
+        /* LEGENDA RESPONSIVA AJUSTADA */
         #subtitles {
-            position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%);
-            width: 85%; max-width: 800px; min-height: 100px;
-            background-color: rgba(5, 5, 10, 0.85); backdrop-filter: blur(12px);
-            border: 1px solid rgba(156, 39, 176, 0.4); border-radius: 15px;
-            display: flex; align-items: center; justify-content: center; text-align: center;
-            color: #ffffff; font-size: 1.4rem; line-height: 1.5; padding: 20px 40px;
-            z-index: 150; opacity: 0; transition: opacity 0.8s ease-in-out;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            pointer-events: none; /* Legenda não interfere em cliques */
+            position: fixed; 
+            bottom: 25px; /* Mais baixo no celular */
+            left: 50%; 
+            transform: translateX(-50%);
+            width: 90%; 
+            max-width: 700px; 
+            min-height: auto; /* Deixa crescer conforme o texto */
+            background-color: rgba(5, 5, 10, 0.75); /* Mais translúcido */
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(156, 39, 176, 0.3); 
+            border-radius: 12px;
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            text-align: center;
+            color: #ffffff; 
+            font-size: clamp(1rem, 4vw, 1.3rem); /* Fonte dinâmica */
+            line-height: 1.4; 
+            padding: 15px 25px;
+            z-index: 150; 
+            opacity: 0; 
+            transition: opacity 0.5s ease-in-out;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.6);
+            pointer-events: none;
+        }
+
+        @media (max-width: 600px) {
+            #subtitles { bottom: 15px; padding: 12px 15px; }
         }
 
         .playing #map { opacity: 0.9; }
@@ -128,20 +143,19 @@
     <audio id="bg-meditation" loop src="/static/meditation_432.mp3"></audio>
 
     <script>
-        // MAPA CONFIGURADO PARA BLOQUEAR INTERAÇÃO (Zoom, Drag, DoubleClick)
         const map = L.map('map', { 
             center: [0, 0], 
             zoom: 2, 
             zoomControl: false, 
             attributionControl: false, 
             worldCopyJump: true,
-            dragging: false,           // Desativa arrastar o mapa
-            scrollWheelZoom: false,    // Desativa zoom com o scroll do mouse
-            doubleClickZoom: false,    // Desativa zoom com duplo clique
-            boxZoom: false,            // Desativa zoom por seleção de caixa
-            tap: false,                // Desativa interações de toque (mobile)
-            touchZoom: false,          // Desativa zoom de pinça (mobile)
-            keyboard: false            // Desativa controle pelo teclado
+            dragging: false,
+            scrollWheelZoom: false,
+            doubleClickZoom: false,
+            boxZoom: false,
+            tap: false,
+            touchZoom: false,
+            keyboard: false
         });
 
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { 
@@ -161,6 +175,20 @@
         let userCoords = { lat: -23.55, lon: -46.63 };
         const audio = document.getElementById('bg-meditation');
         const subtitleDiv = document.getElementById('subtitles');
+
+        // FUNÇÃO DE CHUNKING: Divide o texto longo para não cobrir o mapa
+        async function exibirTextoEmPedacos(texto, tempoTotal) {
+            const frases = texto.match(/[^.!?]+[.!?]+/g) || [texto];
+            const tempoPorFrase = (tempoTotal - 1000) / frases.length;
+
+            for (const frase of frases) {
+                subtitleDiv.style.opacity = "0";
+                await new Promise(r => setTimeout(r, 400));
+                subtitleDiv.innerText = frase.trim();
+                subtitleDiv.style.opacity = "1";
+                await new Promise(r => setTimeout(r, tempoPorFrase - 400));
+            }
+        }
 
         function atualizarTamanhoGlobo(zoom) {
             let tamanhos = { 18: '150px', 15: '150px', 14: '400px', 10: '600px', 8: '800px', 4: '90vw', 2: '75vh' };
@@ -182,24 +210,21 @@
             audio.volume = 0.5;
             audio.play().catch(() => { window.addEventListener('click', () => audio.play(), {once: true}); });
 
-            subtitleDiv.innerText = scriptsMentalizacao[18];
-            subtitleDiv.style.opacity = "1";
-            await new Promise(r => setTimeout(r, 17000));
+            // Primeira etapa (Zoom 18)
+            await exibirTextoEmPedacos(scriptsMentalizacao[18], 17000);
 
+            // Segunda etapa (Zoom 15)
             subtitleDiv.style.opacity = "0";
             await new Promise(r => setTimeout(r, 800));
-            subtitleDiv.innerText = scriptsMentalizacao[15];
-            subtitleDiv.style.opacity = "1";
-            await new Promise(r => setTimeout(r, 16200));
+            await exibirTextoEmPedacos(scriptsMentalizacao[15], 16200);
 
+            // Ciclo das demais etapas
             const etapas = [14, 10, 8, 4, 2];
             for (const z of etapas) {
                 subtitleDiv.style.opacity = "0";
                 await new Promise(r => setTimeout(r, 1000));
-                await zoomPara(z);
-                subtitleDiv.innerText = scriptsMentalizacao[z];
-                subtitleDiv.style.opacity = "1";
-                await new Promise(r => setTimeout(r, 15000));
+                await zoomPara(z); // Vôo preservado
+                await exibirTextoEmPedacos(scriptsMentalizacao[z], 15000);
                 subtitleDiv.style.opacity = "0";
                 await new Promise(r => setTimeout(r, 1000));
             }
