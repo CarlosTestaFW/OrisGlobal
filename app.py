@@ -90,9 +90,15 @@ async def gerar_meditacao(dados: DadosMeditacao):
         print(f"Erro na geração: {e}")
         return {"texto": "Em harmonia com o todo.", "audio_url": ""}
 
+# if __name__ == "__main__":
+#     # Host 0.0.0.0 é melhor para Linux/Docker/Rede Local
+#     # uvicorn.run(app, host="0.0.0.0", port=8000)
+#     import os
+#     port = int(os.environ.get("PORT", 8000))
+#     uvicorn.run(app, host="0.0.0.0", port=port)
+
 if __name__ == "__main__":
-    # Host 0.0.0.0 é melhor para Linux/Docker/Rede Local
-    # uvicorn.run(app, host="0.0.0.0", port=8000)
+    import uvicorn
     import os
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 10000))
     uvicorn.run(app, host="0.0.0.0", port=port)
