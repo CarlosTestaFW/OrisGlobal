@@ -87,12 +87,17 @@ async def gerar_meditacao(dados: DadosMeditacao):
         print(f"Erro na geração: {e}")
         return {"texto": "Em harmonia com o todo.", "audio_url": ""}
 
-# --- NOVA ROTA DE VOZ DINÂMICA (Para as legendas do mapa) ---
+# --- ROTA DE VOZ DINÂMICA COM VELOCIDADE AJUSTADA ---
 @app.get("/api/voice")
 async def get_voice(text: str):
-    """Gera áudio em tempo real sem salvar arquivo em disco"""
+    """Gera áudio em tempo real com cadência meditativa (-20%)"""
     try:
-        communicate = edge_tts.Communicate(text, "pt-BR-AntonioNeural")
+        # O parâmetro rate="-20%" torna a fala mais lenta e profunda
+        # o rate diminuindo torna a voz mais calma e meditativa
+        # communicate = edge_tts.Communicate(text, "pt-BR-AntonioNeural", rate="-35%")
+        # communicate = edge_tts.Communicate(text, "pt-BR-FranciscaNeural", rate="-35%")
+        communicate = edge_tts.Communicate(text, "pt-BR-ThalitaNeural", rate="-25%",pitch="-5Hz")
+        # communicate = edge_tts.Communicate(text, "pt-BR-FabioNeural", rate="-25%",pitch="-5Hz")
         
         audio_stream = io.BytesIO()
         async for chunk in communicate.stream():
