@@ -1,12 +1,13 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from datetime import datetime
-import google.generativeai as genai
+import os
+import io
 import edge_tts
 import uvicorn
-import os
+import datetime
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+import google.generativeai as genai
 
 # --- CONFIGURAÇÃO DE DIRETÓRIOS ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -17,10 +18,8 @@ IS_RENDER = "RENDER" in os.environ
 
 app = FastAPI(title="Oris - Oração Sincronizada")
 
-# O mount serve os assets (JS, CSS, MP3) de dentro da pasta static
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
 # --- CONFIGURAÇÃO DA IA (GEMINI) ---
+# Recomendado: Usar variável de ambiente no Render para a chave
 api_key = os.environ.get("GOOGLE_API_KEY", "AIzaSyDGCEnesZvSDZx4VEs9pYQMMgqC-pcU1pE")
 genai.configure(api_key=api_key)
 MODEL_NAME = 'models/gemini-1.5-flash'
@@ -35,7 +34,7 @@ class DadosMeditacao(BaseModel):
 
 @app.get("/")
 async def read_index():
-    """Entrega a Página Inicial (index.html) que está na RAIZ"""
+    """Entrega a Página Inicial (index.html) na RAIZ"""
     path_index = os.path.join(BASE_DIR, "index.html")
     if os.path.exists(path_index):
         return FileResponse(path_index)
@@ -43,7 +42,7 @@ async def read_index():
 
 @app.get("/mapa.html")
 async def read_mapa():
-    """Entrega a Página do Mapa que está em /static"""
+    """Entrega a Página do Mapa em /static"""
     path_mapa = os.path.join(STATIC_DIR, "mapa.html")
     if os.path.exists(path_mapa):
         return FileResponse(path_mapa)
@@ -52,9 +51,17 @@ async def read_mapa():
 # --- SINCRONIZAÇÃO E IA ---
 @app.get("/sync")
 def sync_clock():
-    agora = datetime.now()
-    seg_restantes = 10 #15 - ((agora.hour * 3600 + agora.minute * 60 + agora.second) % 15)
-    return {"segundos_restantes": seg_restantes}
+    agora = datetime.datetime.now()
+    # Lógica para ciclos de 15 minutos (00, 15, 30, 45)
+    proximo_bloco = ((agora.minute // 15) + 1) * 15
+    if proximo_bloco == 60: proximo_bloco = 0
+    
+    # Cálculo de segundos restantes
+    minutos_faltam = (proximo_bloco - agora.minute) % 15
+    if minutos_faltam == 0 and agora.second > 0: minutos_faltam = 15
+    
+    segundos_restantes = (minutos_faltam * 60) - agora.second
+    return {"segundos_restantes": segundos_restantes}
 
 @app.post("/gerar-meditacao")
 async def gerar_meditacao(dados: DadosMeditacao):
@@ -74,16 +81,33 @@ async def gerar_meditacao(dados: DadosMeditacao):
         
         return {
             "texto": texto, 
-            "audio_url": f"/static/{audio_filename}?v={datetime.now().timestamp()}"
+            "audio_url": f"/static/{audio_filename}?v={datetime.datetime.now().timestamp()}"
         }
     except Exception as e:
         print(f"Erro na geração: {e}")
         return {"texto": "Em harmonia com o todo.", "audio_url": ""}
 
-# No final do arquivo, o bloco de execução:
+# --- NOVA ROTA DE VOZ DINÂMICA (Para as legendas do mapa) ---
+@app.get("/api/voice")
+async def get_voice(text: str):
+    """Gera áudio em tempo real sem salvar arquivo em disco"""
+    try:
+        communicate = edge_tts.Communicate(text, "pt-BR-AntonioNeural")
+        
+        audio_stream = io.BytesIO()
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio_stream.write(chunk["data"])
+        
+        audio_stream.seek(0)
+        return StreamingResponse(audio_stream, media_type="audio/mpeg")
+    except Exception as e:
+        print(f"Erro no streaming de voz: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- REGRAS DE OURO: Mount deve ser a última rota configurada ---
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
 if __name__ == "__main__":
-    # Se estiver no Render, usa a porta deles. Se for local, usa 8000.
     port = int(os.environ.get("PORT", 8000))
-    # No local, o reload=True ajuda no desenvolvimento (reinicia ao salvar)
-    # No Render, o reload deve ser False
     uvicorn.run("app:app", host="0.0.0.0", port=port, reload=not IS_RENDER)

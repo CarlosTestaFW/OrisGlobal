@@ -54,7 +54,9 @@
             box-shadow: 0 15px 50px rgba(0,0,0,0.8); pointer-events: none;
         }
 
+        /* TIMER DE DEBUG - DESATIVADO (display: none) */
         #debug-timer {
+            display: none; 
             position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
             background: rgba(0, 120, 215, 0.8); color: white;
             font-family: monospace; font-size: 11px; padding: 4px 12px;
@@ -92,7 +94,7 @@
             10: "Projetamos luz sobre toda a nossa cidade. Mentalizamos o equilíbrio em nossos centros e bairros distantes. Que a convivência seja pacífica e que o cuidado mútuo floreça.",
             8: "Nossa intenção abraça agora todo o nosso estado. Enviamos ondas de equilíbrio para as cidades e campos. Que a sabedoria oriente as decisões coletivas e que o amparo chegue aos vulneráveis.",
             4: "Inundamos nossa nação com ondas de paz. Visualizamos a união de todos os povos, transcendendo diferenças. Que a prosperidade floresça com justiça e que o amor se manifeste em amparo e fraternidade.",
-            2: "Tornamo-noc um com a Terra. Do alto, vemos um mundo sem fronteiras, envolto em cura. Que a corrente de oração planetária sustente a vida e eleve a consciência humana hoje e sempre."
+            2: "Tornamo-nos um com a Terra. Do alto, vemos um mundo sem fronteiras, envolto em cura. Que a corrente de oração planetária sustente a vida e eleve a consciência humana hoje e sempre."
         };
 
         const debugEl = document.getElementById('debug-timer');
@@ -100,29 +102,45 @@
         let userCoords = { lat: -23.55, lon: -46.63 };
 
         async function runDebugTimer(fase, segundos) {
-            for (let i = segundos; i > 0; i--) {
-                debugEl.innerText = `DEBUG | FASE: ${fase} | T: ${i}s | TOTAL PEDAÇO: 11s`;
-                await new Promise(r => setTimeout(r, 1000));
+            if (debugEl.style.display !== 'none') {
+                for (let i = segundos; i > 0; i--) {
+                    debugEl.innerText = `DEBUG | FASE: ${fase} | T: ${i}s | TOTAL PEDAÇO: 11s`;
+                    await new Promise(r => setTimeout(r, 1000));
+                }
+            } else {
+                await new Promise(r => setTimeout(r, segundos * 1000));
             }
         }
 
-        // CADÊNCIA ATUALIZADA: 1s (Pausa) -> 1s (FadeIn) -> 7s (Exposto) -> 1s (FadeOut) -> 1s (Pausa)
+        // CADÊNCIA COM VOZ SINCRONIZADA: 1s (Pausa) -> 1s (FadeIn) -> VOZ + 7s (Exposto) -> 1s (FadeOut) -> 1s (Pausa)
         async function exibirTextoEmPedacos(texto) {
             const frases = texto.match(/[^.!?]+[.!?]+/g) || [texto];
 
             for (const frase of frases) {
+                const textoLimpo = frase.trim();
+
+                // 1. Respiro Pré (1s)
                 subtitleDiv.style.opacity = "0";
                 await runDebugTimer("RESPIRO PRÉ", 1);
 
-                subtitleDiv.innerText = frase.trim();
+                // 2. Fade In (1s)
+                subtitleDiv.innerText = textoLimpo;
                 subtitleDiv.style.opacity = "1";
                 await runDebugTimer("FADE IN", 1);
                 
-                await runDebugTimer("LENDO (7s)", 7); // Exposição aumentada para 7s
+                // 3. DISPARO DA VOZ IA (Sincronizado com o início da leitura estática)
+                const narraAudio = new Audio(`/api/voice?text=${encodeURIComponent(textoLimpo)}`);
+                narraAudio.volume = 0.9; // Volume da voz superior ao da música de fundo
+                narraAudio.play().catch(e => console.log("Aguardando interação para áudio:", e));
+
+                // 4. Lendo / Ouvindo (7s)
+                await runDebugTimer("LENDO + VOZ", 7);
                 
+                // 5. Fade Out (1s)
                 subtitleDiv.style.opacity = "0";
                 await runDebugTimer("FADE OUT", 1);
 
+                // 6. Respiro Pós (1s)
                 await runDebugTimer("RESPIRO PÓS", 1);
             }
         }
@@ -144,9 +162,9 @@
         }
 
         async function iniciarJornadaOrbital() {
-            const audio = document.getElementById('bg-meditation');
-            audio.volume = 0.5;
-            audio.play().catch(() => { window.addEventListener('click', () => audio.play(), {once: true}); });
+            const audioMed = document.getElementById('bg-meditation');
+            audioMed.volume = 0.4; // Baixamos um pouco a música para dar foco à voz da IA
+            audioMed.play().catch(() => { window.addEventListener('click', () => audioMed.play(), {once: true}); });
 
             await exibirTextoEmPedacos(scriptsMentalizacao[18]);
             await exibirTextoEmPedacos(scriptsMentalizacao[15]);
@@ -160,6 +178,11 @@
 
             subtitleDiv.innerText = "A paz começa em mim, a paz começa no mundo.";
             subtitleDiv.style.opacity = "1";
+            
+            // Voz final de encerramento
+            const vozFinal = new Audio(`/api/voice?text=${encodeURIComponent("A paz começa em mim, a paz começa no mundo.")}`);
+            vozFinal.play();
+
             await new Promise(r => setTimeout(r, 12000));
             document.body.style.opacity = "0";
             setTimeout(() => { window.location.href = "/"; }, 4000);
