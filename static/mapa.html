@@ -14,123 +14,204 @@
             background-color: #020205; color: white; font-family: 'Segoe UI', sans-serif; 
         }
 
-        #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; opacity: 0; transition: opacity 3s; }
+        .stars-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+        .stars { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: transparent; }
+        .stars-small { 
+            box-shadow: 442px 145px #FFF, 120px 800px #FFF, 1200px 400px #FFF, 800px 200px #FFF, 50px 50px #FFF, 1500px 900px #FFF, 1000px 100px #FFF, 300px 600px #FFF;
+            width: 1px; height: 1px; border-radius: 50%; opacity: 0.5; animation: twinkle 4s infinite ease-in-out;
+        }
+        
+        #map { 
+            position: absolute; top: 0; bottom: 0; width: 100%; z-index: 1; 
+            opacity: 0; transition: opacity 3s ease, border-radius 5s ease, width 5s ease, height 5s ease; 
+            background: transparent !important; cursor: default !important;
+        }
+
+        /* CONFIGURAÇÃO DO GLOBO TERRESTRE */
+        .globe-view #map {
+            border-radius: 50%; width: 85vmin; height: 85vmin;
+            left: 50%; top: 50%; transform: translate(-50%, -50%);
+            box-shadow: 0 0 80px rgba(156, 39, 176, 0.5), inset -20px -20px 50px rgba(0,0,0,0.8);
+        }
+
+        #energy-field {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            border-radius: 50%; z-index: 10; pointer-events: none; opacity: 0;
+            mix-blend-mode: screen;
+            background: radial-gradient(circle, rgba(156, 39, 176, 0.8) 0%, rgba(156, 39, 176, 0.3) 70%, transparent 100%);
+            transition: width 3s ease, height 3s ease, opacity 2s;
+        }
 
         #subtitles {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 80%;
-            max-width: 600px;
-            background: rgba(5, 5, 10, 0.7);
-            backdrop-filter: blur(8px);
-            padding: 15px 25px;
-            border-radius: 20px;
-            border: 1px solid var(--accent);
-            text-align: center;
-            font-size: 1.4rem;
-            z-index: 1000;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 1s;
+            position: fixed; bottom: 65px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 750px; 
+            background-color: rgba(5, 5, 10, 0.85); backdrop-filter: blur(15px);
+            border: 1px solid rgba(156, 39, 176, 0.4); border-radius: 20px;
+            display: flex; align-items: center; justify-content: center; text-align: center;
+            color: #ffffff; font-size: clamp(1.1rem, 4.5vw, 1.4rem); 
+            line-height: 1.6; padding: 25px 40px;
+            z-index: 150; opacity: 0; 
+            transition: opacity 1s ease-in-out;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.8); pointer-events: none;
         }
 
-        @media (max-width: 600px) {
-            #subtitles {
-                bottom: 20px;
-                padding: 10px 15px;
-                font-size: 1rem;
-                width: 85%;
-            }
-            .leaflet-bottom { bottom: 85px !important; }
+        /* TIMER DE DEBUG - DESATIVADO */
+        #debug-timer {
+            display: none; 
+            position: fixed; bottom: 15px; left: 50%; transform: translateX(-50%);
+            background: rgba(0, 120, 215, 0.9); color: white;
+            font-family: monospace; font-size: 11px; padding: 6px 14px;
+            border-radius: 4px; z-index: 200; pointer-events: none;
         }
 
-        .leaflet-container { background: #020205 !important; }
+        .playing #map { opacity: 0.9; }
+        .playing #energy-field { opacity: 1; }
+        .playing #subtitles { opacity: 1; }
     </style>
 </head>
-<body>
+<body class="playing">
+
+    <div class="stars-container"><div class="stars stars-small"></div></div>
     <div id="map"></div>
-    <div id="subtitles">Iniciando busca por sua luz...</div>
+    <div id="energy-field"></div>
+    <div id="subtitles"></div>
+    <div id="debug-timer">Debug: Ativo</div>
+
+    <audio id="bg-meditation" loop src="/static/meditation_432.mp3"></audio>
 
     <script>
-        // Configuração inicial do mapa
-        let map = L.map('map', { zoomControl: false, attributionControl: false }).setView([0, 0], 2);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+        const map = L.map('map', { 
+            center: [0, 0], zoom: 2, zoomControl: false, attributionControl: false, 
+            dragging: false, scrollWheelZoom: false, doubleClickZoom: false, 
+            tap: false, touchZoom: false, keyboard: false
+        });
 
-        // Coordenada padrão (São Paulo) caso o GPS falhe
-        let userCoords = { lat: -23.5505, lon: -46.6333 }; 
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19 }).addTo(map);
+
+        const scriptsMentalizacao = {
+            18: "Respire fundo e sinta a vida pulsar em seu peito. Você é um canal de luz pura. Deixe que essa energia violeta remova as tensões, renovando cada célula e trazendo clareza absoluta.",
+            15: "Sua luz transborda e preenche cada canto do seu lar. Mentalizamos esta casa como um santuário de proteção. Que a harmonia habite aqui, abençoando à todos que aqui moram.",
+            14: "Expandimos nossa vibração para as ruas e vizinhos. Visualizamos uma rede de cooperação conectando cada residência. Que a segurança e a gentileza guiem os passos de todos na comunidade.",
+            10: "Projetamos luz sobre toda a nossa cidade. Mentalizamos o equilíbrio em nossos centros e bairros distantes. Que a convivência seja pacífica e que o cuidado mútuo floreça.",
+            8: "Nossa intenção abraça agora todo o nosso estado. Enviamos ondas de equilíbrio para as cidades e campos. Que a sabedoria oriente as decisões coletivas e que o amparo chegue aos vulneráveis.",
+            4: "Inundamos nossa nação com ondas de paz. Visualizamos a união de todos os povos, transcendendo diferenças. Que a prosperidade floresça com justiça e que o amor se manifeste em amparo e fraternidade.",
+            2: "Tornamo-nos um com a Terra. Do alto, vemos um mundo sem fronteiras, envolto em cura. Que a corrente de oração planetária sustente a vida e eleve a consciência humana hoje e sempre."
+        };
+
+        const debugEl = document.getElementById('debug-timer');
         const subtitleDiv = document.getElementById('subtitles');
+        let userCoords = { lat: -23.55, lon: -46.63 };
 
-        async function localizarUsuario() {
-            return new Promise((resolve) => {
-                if (!navigator.geolocation) {
-                    exibirMensagem("Seu navegador não suporta geolocalização. Usando conexão padrão.");
-                    resolve(userCoords);
+        function runWait(segundos, label) {
+            return new Promise(async (resolve) => {
+                if (debugEl.style.display !== 'none') {
+                    for (let i = segundos; i > 0; i--) {
+                        debugEl.innerText = `DEBUG | ${label} | T: ${i}s`;
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
+                } else {
+                    await new Promise(r => setTimeout(r, segundos * 1000));
                 }
-
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        userCoords = {
-                            lat: position.coords.latitude,
-                            lon: position.coords.longitude
-                        };
-                        resolve(userCoords);
-                    },
-                    (error) => {
-                        let msg = "";
-                        switch(error.code) {
-                            case error.PERMISSION_DENIED:
-                                msg = "Sua localização está oculta. Conectando pelo centro da rede.";
-                                break;
-                            case error.POSITION_UNAVAILABLE:
-                                msg = "Sinal de GPS fraco. Sintonizando frequência padrão.";
-                                break;
-                            case error.TIMEOUT:
-                                msg = "Tempo esgotado. Estabilizando conexão em ponto seguro.";
-                                break;
-                            default:
-                                msg = "Conectando ao fluxo planetário...";
-                        }
-                        exibirMensagem(msg);
-                        resolve(userCoords); // Resolve com a coordenada padrão
-                    },
-                    { timeout: 10000 }
-                );
+                resolve();
             });
         }
 
-        function exibirMensagem(texto) {
-            subtitleDiv.innerText = texto;
-            subtitleDiv.style.opacity = "1";
-        }
+        async function exibirTextoEmPedacos(texto) {
+            const frases = texto.match(/[^.!?]+[.!?]+/g) || [texto];
 
-        async function iniciarFluxo() {
-            // 1. Tenta localizar
-            const coords = await localizarUsuario();
-            map.setView([coords.lat, coords.lon], 2);
-            
-            // 2. Inicia animação de zoom mística
-            const niveisZoom = [2, 5, 10, 14, 18];
-            for (let z of niveisZoom) {
-                map.flyTo([coords.lat, coords.lon], z, {
-                    animate: true,
-                    duration: 3
-                });
+            for (const frase of frases) {
+                const textoLimpo = frase.trim();
+
+                // 1. Respiro Pré (1s)
+                subtitleDiv.style.opacity = "0";
+                await runWait(1, "PAUSA");
+
+                // 2. Fade In (1s) + Voz Imediata
+                subtitleDiv.innerText = textoLimpo;
+                subtitleDiv.style.opacity = "1";
                 
-                // Mensagens variam conforme o zoom
-                if(z === 5) exibirMensagem("Localizando sua presença na Terra...");
-                if(z === 10) exibirMensagem("Sincronizando com os irmãos próximos...");
-                if(z === 18) exibirMensagem("Conexão estabelecida. Respire com o planeta.");
+                const narraAudio = new Audio(`/api/voice?text=${encodeURIComponent(textoLimpo)}`);
+                narraAudio.volume = 0.9;
+                narraAudio.play().catch(e => console.log("Áudio pendente"));
+
+                // 3. Exposição (8s)
+                await runWait(8, "VOZ/LEITURA");
                 
-                await new Promise(r => setTimeout(r, 4500));
+                // 4. Fade Out (1s)
+                subtitleDiv.style.opacity = "0";
+                await runWait(1, "FADE OUT");
+
+                // 5. Respiro Pós (1s)
+                await runWait(1, "PAUSA FINAL");
             }
         }
 
+        function atualizarTamanhoGlobo(zoom) {
+            // Ajuste para abranger toda a imagem no zoom orbital (2)
+            let tamanhos = { 
+                18: '180px', 
+                15: '200px', 
+                14: '450px', 
+                10: '650px', 
+                8: '850px', 
+                4: '95vw', 
+                2: '100vmin' // Garante cobertura total da Terra circular
+            };
+            const size = tamanhos[zoom] || '100px';
+            const ef = document.getElementById('energy-field');
+            if (ef) { ef.style.width = size; ef.style.height = size; }
+        }
+
+        function zoomPara(zoom) {
+            return new Promise((resolve) => {
+                if (zoom === 2) document.body.classList.add('globe-view');
+                atualizarTamanhoGlobo(zoom);
+                map.flyTo([userCoords.lat, userCoords.lon], zoom, { duration: 5 }); 
+                map.once('moveend', resolve);
+            });
+        }
+
+        async function iniciarJornadaOrbital() {
+            const audioMed = document.getElementById('bg-meditation');
+            audioMed.volume = 0.4;
+            audioMed.play().catch(() => { window.addEventListener('click', () => audioMed.play(), {once: true}); });
+
+            await exibirTextoEmPedacos(scriptsMentalizacao[18]);
+            await exibirTextoEmPedacos(scriptsMentalizacao[15]);
+
+            const etapas = [14, 10, 8, 4, 2];
+            for (const z of etapas) {
+                const voo = zoomPara(z); 
+                const texto = exibirTextoEmPedacos(scriptsMentalizacao[z]); 
+                await Promise.all([voo, texto]); 
+            }
+
+            subtitleDiv.innerText = "A paz começa em mim, a paz começa no mundo.";
+            subtitleDiv.style.opacity = "1";
+            
+            const vozFinal = new Audio(`/api/voice?text=${encodeURIComponent("A paz começa em mim, a paz começa no mundo.")}`);
+            vozFinal.play();
+
+            await runWait(12, "FIM");
+            document.body.style.opacity = "0";
+            setTimeout(() => { window.location.href = "/"; }, 4000);
+        }
+
         window.onload = () => {
-            document.getElementById('map').style.opacity = "1";
-            iniciarFluxo();
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    userCoords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+                    configurarMapaInicial();
+                }, () => configurarMapaInicial());
+            } else { configurarMapaInicial(); }
         };
+
+        function configurarMapaInicial() {
+            map.setView([userCoords.lat, userCoords.lon], 18);
+            atualizarTamanhoGlobo(18);
+            document.getElementById('map').style.opacity = "1";
+            iniciarJornadaOrbital();
+        }
     </script>
 </body>
 </html>
