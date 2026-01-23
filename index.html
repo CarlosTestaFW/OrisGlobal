@@ -25,12 +25,7 @@
             z-index: -1;
         }
 
-        main { 
-            display: flex; 
-            height: 100vh; 
-            width: 100vw; 
-            flex-direction: row; 
-        }
+        main { display: flex; height: 100vh; width: 100vw; flex-direction: row; }
 
         .content-section {
             flex: 1; display: flex; flex-direction: column;
@@ -39,14 +34,13 @@
         }
 
         header h1 {
-            font-size: clamp(3.5rem, 10vw, 4.5rem); margin: 0; letter-spacing: -2px;
+            font-size: clamp(3rem, 10vw, 4.5rem); margin: 0; letter-spacing: -2px;
             background: linear-gradient(to right, #fff, var(--glow));
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
 
         .action-sidebar {
-            position: relative;
-            width: 450px; background: rgba(255, 255, 255, 0.03);
+            position: relative; width: 450px; background: rgba(255, 255, 255, 0.03);
             backdrop-filter: blur(20px); border-left: 1px solid rgba(255, 255, 255, 0.1);
             display: flex; flex-direction: column; align-items: center;
             justify-content: center; z-index: 10; padding: 40px;
@@ -67,22 +61,19 @@
             background: radial-gradient(circle, rgba(206, 147, 216, 0.7) 0%, rgba(156, 39, 176, 0.3) 60%, transparent 100%);
             box-shadow: 0 0 80px rgba(156, 39, 176, 0.4);
             opacity: 0; transition: width 3s ease, height 3s ease, opacity 2s ease;
-            z-index: 5; pointer-events: none;
-            mix-blend-mode: screen;
+            z-index: 5; pointer-events: none; mix-blend-mode: screen;
         }
 
         #countdown { 
             font-size: clamp(3rem, 15vw, 5rem); font-weight: 800; display: none; z-index: 20;
-            text-shadow: 0 0 30px var(--accent); color: white; 
-            margin-bottom: 20px;
+            text-shadow: 0 0 30px var(--accent); color: white; margin-bottom: 20px;
+            font-variant-numeric: tabular-nums;
         }
 
         #subtitles {
-            z-index: 20; display: none;
-            width: 85%; font-size: 1.1rem; opacity: 0;
-            transition: opacity 1s; font-style: italic;
-            color: var(--glow); line-height: 1.4;
-            min-height: 3em;
+            z-index: 20; display: none; width: 85%; font-size: 1.1rem; opacity: 0;
+            transition: opacity 1s; font-style: italic; color: var(--glow); 
+            line-height: 1.4; min-height: 3em;
         }
 
         .waiting-mode #start-btn { display: none; }
@@ -92,41 +83,14 @@
             animation: pulse-globe 4s infinite ease-in-out; 
         }
 
-        /* AJUSTE DE PROPORÇÃO PARA CELULAR */
         @media (max-width: 850px) {
-            main { 
-                flex-direction: column;
-                justify-content: center;
-            }
-            
-            .content-section {
-                flex: 0 0 auto; 
-                padding: 40px 20px;
-                text-align: center; 
-                align-items: center;
-            }
-
-            .action-sidebar {
-                flex: 0 0 auto;
-                width: 100%; 
-                border-left: none;
-                background: transparent;
-                backdrop-filter: none;
-                padding: 20px;
-            }
-
-            #start-btn { 
-                width: 85%; /* Proporção equilibrada */
-                max-width: 320px; 
-                padding: 20px;
-                font-size: 1rem;
-            }
-
-            .waiting-mode #energy-globe { 
-                width: 280px; height: 280px; 
-            }
-
-            p { font-size: 1.1rem !important; margin-top: 20px; }
+            main { flex-direction: column; justify-content: center; }
+            .content-section { flex: 0 0 auto; padding: 30px 20px; text-align: center; align-items: center; }
+            .action-sidebar { flex: 1; width: 100%; border-left: none; background: transparent; backdrop-filter: none; padding: 10px; }
+            #start-btn { width: 85%; max-width: 320px; }
+            .waiting-mode #energy-globe { width: 260px; height: 260px; }
+            header h1 { font-size: 2.8rem; }
+            p { font-size: 1rem !important; margin-top: 10px; line-height: 1.4 !important; }
         }
 
         @keyframes pulse-globe {
@@ -158,19 +122,36 @@
 
     <script>
         let segRestantes = 0;
+        let timerPrincipal = null;
         const audio = document.getElementById('audio-abertura');
 
+        // LÓGICA INFALÍVEL COM OPERADOR DE RESTO (%)
         function calcularTempo() {
             const agora = new Date();
-            const min = agora.getMinutes();
-            const seg = agora.getSeconds();
-            const proximoBloco = Math.ceil((min + 0.1) / 15) * 15;
-            segRestantes = 5;   //(proximoBloco - min) * 60 - seg;
+            const minutosAtuais = agora.getMinutes();
+            const segundosAtuais = agora.getSeconds();
+            
+            // Ciclo total: 15 minutos (900 segundos)
+            const cicloTotal = 15 * 60; 
+            
+            // Quantos segundos já se passaram dentro do bloco atual de 15 minutos
+            const passadosNoBloco = (minutosAtuais % 15) * 60 + segundosAtuais;
+            
+            // O que falta para o próximo bloco
+            segRestantes = cicloTotal - passadosNoBloco;
+
+            // Se o cálculo der 0 (na mosca), assume o próximo ciclo cheio
+            if (segRestantes <= 0) segRestantes = cicloTotal;
         }
 
         function iniciarFluxo() {
+            // 1. Calcula o tempo real no momento exato do clique
             calcularTempo();
+            
+            // 2. Ativa o visual
             document.getElementById('main-body').classList.add('waiting-mode');
+            
+            // 3. Audio Fade-in
             audio.volume = 0;
             audio.play();
             let vol = 0;
@@ -178,18 +159,25 @@
                 if (vol < 0.4) { vol += 0.02; audio.volume = vol; } else { clearInterval(fadeIn); }
             }, 100);
 
-            const timer = setInterval(() => {
+            // 4. Limpa timers antigos e inicia o novo
+            if(timerPrincipal) clearInterval(timerPrincipal);
+            
+            timerPrincipal = setInterval(() => {
                 segRestantes--;
+                
                 const m = Math.floor(segRestantes / 60);
                 const s = segRestantes % 60;
+                
                 document.getElementById('countdown').innerText = 
                     `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                
                 atualizarLegendas(segRestantes);
+
                 if (segRestantes <= 0) {
-                    clearInterval(timer);
-                    document.body.style.transition = "opacity 2s";
+                    clearInterval(timerPrincipal);
+                    document.body.style.transition = "opacity 2.5s";
                     document.body.style.opacity = 0;
-                    setTimeout(() => { window.location.href = "/static/mapa.html"; }, 2000);
+                    setTimeout(() => { window.location.href = "/mapa.html"; }, 2500);
                 }
             }, 1000);
         }
@@ -197,10 +185,10 @@
         function atualizarLegendas(s) {
             const sub = document.getElementById('subtitles');
             sub.style.opacity = 1;
-            if (s > 45) sub.innerText = "Respire fundo... sinta a energia lilás ao seu redor.";
-            else if (s > 25) sub.innerText = "O mundo silencia para ouvir a nossa intenção coletiva.";
-            else if (s > 5) sub.innerText = "Prepare-se... a conexão orbital vai começar.";
-            else { sub.style.opacity = 0; }
+            if (s > 600) sub.innerText = "Respire fundo... sinta a energia lilás ao seu redor.";
+            else if (s > 300) sub.innerText = "O mundo silencia para ouvir a nossa intenção coletiva.";
+            else if (s > 60) sub.innerText = "Prepare-se... a conexão orbital vai começar.";
+            else sub.innerText = "Sintonizando com a rede de luz...";
         }
     </script>
 </body>
